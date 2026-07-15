@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NeuroMap v2.5 — Cyber-Medical Imaging Intelligence</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body class="cyber-medical-theme">
+
+  <!-- Background Decorative Grid & Pulsing Lights -->
+  <div class="grid-overlay"></div>
+  <div class="glow-orb orb-primary"></div>
+  <div class="glow-orb orb-secondary"></div>
+
+  <!-- ── HEADER ─────────────────────────────────────────────────── -->
+  <header class="main-header">
+    <div class="header-container">
+      <div class="brand-group">
+        <div class="logo-wrapper">
+          <svg class="neuro-logo" width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="15" stroke="currentColor" stroke-width="1.5" class="logo-ring-outer"/>
+            <circle cx="16" cy="16" r="8" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" class="logo-ring-inner"/>
+            <path d="M10 16 C 12 10, 14 6, 16 16 C 18 26, 20 22, 22 16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="logo-wave"/>
+            <circle cx="10" cy="16" r="2" fill="var(--color-accent-red)" class="logo-dot-1"/>
+            <circle cx="22" cy="16" r="2" fill="var(--color-accent-teal)" class="logo-dot-2"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <span class="brand-title">NEUROMAP</span>
+            <span class="brand-version">v2.5 PRO</span>
+          </div>
+          <span class="brand-sub">Clinical MRI Hybrid Segmentation & Classification</span>
+        </div>
+      </div>
+
+      <div class="status-console">
+        <div class="status-item" id="serverState">
+          <span class="pulse-indicator pulse-active"></span>
+          <span class="status-label">SERVER ONLINE</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-item" id="deviceState">
+          <svg class="cpu-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="5" width="14" height="14" rx="2" ry="2"></rect>
+            <path d="M9 1v4M15 1v4M9 19v4M15 19v4M23 9h-4M23 15h-4M5 9H1M5 15H1"></path>
+          </svg>
+          <span class="device-label" id="deviceValue">RESOLVING...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── MAIN CONTENT CONTAINER ─────────────────────────────────── -->
+  <main class="dashboard-viewport">
+    
+    <!-- ── HERO / INTRO SECTION ─────────────────────────────────── -->
+    <section class="dashboard-hero">
+      <div class="hero-left">
+        <span class="diagnostic-eyebrow">NEUROSEG COGNITIVE ENGINE</span>
+        <h1 class="diagnostic-title">Autonomous Brain Tissue Mapping</h1>
+        <p class="diagnostic-subtitle">
+          An advanced diagnostic workspace executing a 5-stage mathematical tissue segmentation 
+          followed by deep learning tumor localization with gradient-weighted explainability (Grad-CAM).
+        </p>
+
+        <!-- Capability Feature Strip -->
+        <div class="hero-features-strip">
+          <div class="hero-feature-chip">
+            <div class="chip-icon chip-icon-detect">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+              </svg>
+            </div>
+            <div class="chip-text">
+              <span class="chip-value">4 Classes</span>
+              <span class="chip-label">Tumor Detection</span>
+            </div>
+          </div>
+
+          <div class="hero-feature-chip">
+            <div class="chip-icon chip-icon-pipeline">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+            </div>
+            <div class="chip-text">
+              <span class="chip-value">5 Stages</span>
+              <span class="chip-label">NeuroSeg Pipeline</span>
+            </div>
+          </div>
+
+          <div class="hero-feature-chip">
+            <div class="chip-icon chip-icon-cam">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </div>
+            <div class="chip-text">
+              <span class="chip-value">Grad-CAM</span>
+              <span class="chip-label">Explainability</span>
+            </div>
+          </div>
+
+          <div class="hero-feature-chip">
+            <div class="chip-icon chip-icon-area">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+            </div>
+            <div class="chip-text">
+              <span class="chip-value">Area Map</span>
+              <span class="chip-label">Tumor Region</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── INTERACTIVE QUICK TEST SAMPLES ────────────────────────── -->
+    <section class="samples-section">
+      <div class="section-header-row">
+        <div class="section-label-group">
+          <span class="section-indicator"></span>
+          <h2 class="section-title-text">Preset Clinical Workloads</h2>
+        </div>
+        <p class="section-meta-text">Select a standard pathology sample to run instant diagnostic pipeline simulation.</p>
+      </div>
+
+      <div class="samples-grid">
+        <div class="sample-card" data-sample="glioma">
+          <div class="sample-thumb-container">
+            <img src="{{ url_for('static', filename='samples/glioma.jpg') }}" alt="Glioma MRI" class="sample-thumb-img">
+            <div class="sample-badge badge-high">Pathology: Glioma</div>
+          </div>
+          <div class="sample-details">
+            <h4 class="sample-name">Sample WORKLOAD-01</h4>
+            <span class="sample-metadata">Glioma suspect scan</span>
+          </div>
+        </div>
+
+        <div class="sample-card" data-sample="meningioma">
+          <div class="sample-thumb-container">
+            <img src="{{ url_for('static', filename='samples/meningioma.jpg') }}" alt="Meningioma MRI" class="sample-thumb-img">
+            <div class="sample-badge badge-medium">Pathology: Meningioma</div>
+          </div>
+          <div class="sample-details">
+            <h4 class="sample-name">Sample WORKLOAD-02</h4>
+            <span class="sample-metadata">Meningioma suspect scan</span>
+          </div>
+        </div>
+
+        <div class="sample-card" data-sample="pituitary">
+          <div class="sample-thumb-container">
+            <img src="{{ url_for('static', filename='samples/pituitary.jpg') }}" alt="Pituitary MRI" class="sample-thumb-img">
+            <div class="sample-badge badge-medium">Pathology: Pituitary</div>
+          </div>
+          <div class="sample-details">
+            <h4 class="sample-name">Sample WORKLOAD-03</h4>
+            <span class="sample-metadata">Pituitary Tumor suspect scan</span>
+          </div>
+        </div>
+
+        <div class="sample-card" data-sample="notumor">
+          <div class="sample-thumb-container">
+            <img src="{{ url_for('static', filename='samples/notumor.jpg') }}" alt="Normal MRI" class="sample-thumb-img">
+            <div class="sample-badge badge-none">Pathology: None</div>
+          </div>
+          <div class="sample-details">
+            <h4 class="sample-name">Sample WORKLOAD-04</h4>
+            <span class="sample-metadata">No tumor detected</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CORE GRID WORKSPACE ────────────────────────────────────── -->
+    <div class="workspace-grid">
+
+      <!-- COLUMN 1: CONTROLS & ACQUISITION -->
+      <aside class="workspace-panel panel-acquisition">
+        <div class="panel-header">
+          <span class="panel-tag">[SECTION_01]</span>
+          <h3 class="panel-title">Data Acquisition</h3>
+        </div>
+
+        <div class="file-drop-container" id="dropZone">
+          <div class="drop-zone-overlay"></div>
+          
+          <!-- Upload Idle State -->
+          <div class="drop-state-idle" id="dropContent">
+            <div class="upload-icon-wrapper">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </div>
+            <h4 class="upload-title">Ingest MRI DICOM / Scan</h4>
+            <p class="upload-sub">Drag & Drop or browse scanner file</p>
+            <span class="upload-specs">PNG, JPG, BMP up to 16MB</span>
+            <label class="btn-primary file-input-label" for="fileInput">Browse Local Storage</label>
+            <input type="file" id="fileInput" accept="image/*" hidden/>
+          </div>
+
+          <!-- Upload Active Preview State -->
+          <div class="drop-state-preview" id="previewContent" style="display:none">
+            <div class="scanner-preview-frame">
+              <img id="previewImg" alt="MRI Preview Source"/>
+              <div class="scanner-laser-line"></div>
+            </div>
+            <div class="preview-file-meta">
+              <div class="file-details">
+                <span class="file-name" id="previewName">mri_acq_001.png</span>
+                <span class="file-size" id="previewSize">Calculating...</span>
+              </div>
+              <button class="btn-icon-clear" id="clearBtn" title="Unload scan">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyzer Launch Trigger -->
+        <button class="btn-analyze-execute" id="analyzeBtn" disabled>
+          <span class="btn-text" id="btnText">EXECUTE CLINICAL INFERENCE</span>
+          <div class="loader-wave" id="btnSpinner" style="display:none">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </button>
+
+        <!-- Pipeline Diagnostics Log -->
+        <div class="acquisition-logs">
+          <div class="log-header">
+            <span>INFERENCE ENGINE TERMINAL</span>
+            <span class="blink-dot"></span>
+          </div>
+          <div class="log-body" id="terminalLogs">
+            <div class="log-line text-muted">&gt; System initialized. Awaiting MRI input...</div>
+          </div>
+        </div>
+
+        <div class="panel-disclaimer">
+          <div class="disclaimer-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <p class="disclaimer-text">
+            <strong>RESEARCH & DEVELOPMENT ENVIRONMENT:</strong> Not cleared for diagnostic validation. Output should be verified by a board-certified radiologist.
+          </p>
+        </div>
+      </aside>
+
+      <!-- COLUMN 2: ANALYZER DIAGNOSTICS & COCKPIT -->
+      <section class="workspace-panel panel-diagnostics" id="resultsPanel">
+        <div class="panel-header">
+          <span class="panel-tag">[SECTION_02]</span>
+          <h3 class="panel-title">Diagnostic Cockpit</h3>
+        </div>
+
+        <!-- Empty / Idle State -->
+        <div class="diagnostics-empty-state" id="emptyState">
+          <div class="empty-state-visual">
+            <div class="radar-ping"></div>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="empty-icon">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+            </svg>
+          </div>
+          <h4 class="empty-title">Awaiting Scanner Input</h4>
+          <p class="empty-subtitle">Upload a brain MRI or select one of the clinical preset workloads to run the diagnostic dashboard.</p>
+        </div>
+
+        <!-- Diagnostic Workspace Panel (Shown on API success) -->
+        <div class="diagnostics-active-content" id="resultContent" style="display:none">
+          
+          <!-- Diagnostic Verdict Header Card -->
+          <div class="verdict-banner-card" id="verdictCard">
+            <div class="verdict-main">
+              <div class="verdict-status-row">
+                <span class="verdict-tag">PRIMARY FINDING</span>
+                <span class="severity-glow-badge" id="severityBadge">NONE</span>
+              </div>
+              <h2 class="verdict-title-text" id="verdictName">RESOLVED_DIAGNOSIS</h2>
+              <p class="verdict-description" id="verdictDesc">Detailed medical class description.</p>
+            </div>
+            
+            <div class="verdict-numeric">
+              <div class="conf-ring-wrapper">
+                <svg class="ring-svg" width="80" height="80" viewBox="0 0 36 36">
+                  <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--bg-elevated)" stroke-width="3"></path>
+                  <path class="ring-fill" id="verdictConfRing" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="0, 100"></path>
+                  <text x="18" y="20.35" class="ring-text" id="confValue">0%</text>
+                </svg>
+                <span class="ring-label">CLASSIFIER CERTAINTY</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert warning for low confidence model predictions -->
+          <div class="low-conf-alert" id="lowConfWarn" style="display:none">
+            <div class="alert-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              </svg>
+            </div>
+            <div class="alert-content">
+              <span class="alert-title">Low Confidence Alert (&lt;70%)</span>
+              <p class="alert-desc">The model prediction is below safety thresholds. Verify anatomical orientation or consider manual region-of-interest cropping.</p>
+            </div>
+          </div>
+
+          <!-- Interactive Workspace Viewer (Tabbed Panel) -->
+          <div class="image-viewer-workspace">
+            
+            <div class="viewer-controls-bar">
+              <div class="viewer-tabs" id="viewerTabs">
+                <button class="tab-btn active" data-view="composite">Composite Blend</button>
+                <button class="tab-btn" data-view="segmented">Segmented Brain</button>
+                <button class="tab-btn" data-view="gradcam">Activation Map</button>
+                <button class="tab-btn" data-view="mask">Tissue Mask</button>
+              </div>
+            </div>
+
+            <!-- Viewport Screen -->
+            <div class="viewer-screen-wrapper">
+              
+              <!-- Tab View: Composite Blend (With interactive opacity slider) -->
+              <div class="view-panel" id="viewComposite">
+                <div class="blend-image-container">
+                  <img id="blendBaseImg" class="blend-base-img" src="" alt="Base Anatomical MRI"/>
+                  <img id="blendOverlayImg" class="blend-overlay-img" src="" alt="Overlay Heatmap"/>
+                </div>
+                <div class="blend-slider-control">
+                  <span class="slider-label-min">Anatomical MRI</span>
+                  <div class="slider-input-wrapper">
+                    <input type="range" id="blendSlider" min="0" max="100" value="65" class="blend-range-input"/>
+                    <span class="slider-bubble" id="sliderBubble">65%</span>
+                  </div>
+                  <span class="slider-label-max" id="blendSliderLabel">Heatmap Overlay</span>
+                </div>
+              </div>
+
+              <!-- Tab View: Segmented Original -->
+              <div class="view-panel" id="viewSegmented" style="display:none">
+                <div class="standard-viewport-frame">
+                  <img id="origImg" src="" alt="Segmented Brain tissue"/>
+                  <span class="viewport-tag-overlay">NeuroSeg Output</span>
+                </div>
+              </div>
+
+              <!-- Tab View: Grad-CAM Overlay -->
+              <div class="view-panel" id="viewGradcam" style="display:none">
+                <div class="standard-viewport-frame">
+                  <img id="gradcamImg" src="" alt="Grad-CAM Hotspots"/>
+                  <div class="heatmap-spectral-bar">
+                    <span>Low Activation</span>
+                    <div class="gradient-spectrum"></div>
+                    <span>High Activation</span>
+                  </div>
+                  <span class="viewport-tag-overlay">Grad-CAM Heatmap</span>
+                </div>
+                <div class="empty-gradcam-state" id="gradcamEmptyState" style="display:none">
+                  <div class="empty-state-visual">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                  </div>
+                  <h5 class="empty-title">Explainability Map Inactive</h5>
+                  <p class="empty-subtitle">Activation heatmaps are only generated when a pathology (tumor) is detected.</p>
+                </div>
+              </div>
+
+              <!-- Tab View: Segmentation Mask -->
+              <div class="view-panel" id="viewMask" style="display:none">
+                <div class="standard-viewport-frame">
+                  <img id="maskImg" src="" alt="Segmented tissue mask"/>
+                  <span class="viewport-tag-overlay">Binary Target Mask</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Secondary Row: Class Probabilities & Clinical Guidance -->
+          <div class="diagnostics-sub-grid">
+            
+            <!-- Class Probabilities Panel -->
+            <div class="sub-card card-probabilities">
+              <h4 class="sub-card-title">CLASSIFICATION PROBABILITY MATRIX</h4>
+              <div class="probabilities-list" id="probBars">
+                <!-- Filled in dynamically -->
+              </div>
+            </div>
+
+            <!-- Clinical Action Card -->
+            <div class="sub-card card-guidance">
+              <h4 class="sub-card-title">CLINICAL RECOMMENDATIONS</h4>
+              <div class="guidance-content" id="clinicalGuidance">
+                <!-- Updated dynamically -->
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ── INTERACTIVE PIPELINE ANALYZER ────────────────────────── -->
+    <section class="pipeline-analyzer-section">
+      <div class="section-header-row">
+        <div class="section-label-group">
+          <span class="section-indicator"></span>
+          <h2 class="section-title-text">NeuroSeg Processing Architecture</h2>
+        </div>
+        <p class="section-meta-text">Click on any pipeline stage to inspect the real-time OpenCV mathematical operations applied to isolate tissue.</p>
+      </div>
+
+      <div class="pipeline-progress-flow">
+        
+        <div class="pipeline-node active" data-stage="1">
+          <div class="node-number">01</div>
+          <span class="node-label">CLAHE</span>
+          <div class="node-connector"></div>
+        </div>
+
+        <div class="pipeline-node" data-stage="2">
+          <div class="node-number">02</div>
+          <span class="node-label">Dual Threshold</span>
+          <div class="node-connector"></div>
+        </div>
+
+        <div class="pipeline-node" data-stage="3">
+          <div class="node-number">03</div>
+          <span class="node-label">Morphology</span>
+          <div class="node-connector"></div>
+        </div>
+
+        <div class="pipeline-node" data-stage="4">
+          <div class="node-number">04</div>
+          <span class="node-label">Watershed</span>
+          <div class="node-connector"></div>
+        </div>
+
+        <div class="pipeline-node" data-stage="5">
+          <div class="node-number">05</div>
+          <span class="node-label">Convex Hull</span>
+          <div class="node-connector-arrow"></div>
+        </div>
+
+        <div class="pipeline-node pipeline-node-classifier" data-stage="6">
+          <div class="node-number">06</div>
+          <span class="node-label">EfficientNet B3</span>
+        </div>
+
+      </div>
+
+      <!-- Details Display Board -->
+      <div class="pipeline-details-board" id="pipelineDetailsCard">
+        <div class="details-graphic-side">
+          <div class="svg-stage-container" id="stageSvgContainer">
+            <!-- Stage SVG loaded dynamically in JS -->
+          </div>
+        </div>
+        
+        <div class="details-text-side">
+          <div class="details-tag" id="stageTag">STAGE 01 — PREPROCESSING</div>
+          <h3 class="details-heading" id="stageTitle">Adaptive Contrast Normalization (CLAHE)</h3>
+          <p class="details-description" id="stageDesc">
+            Contrast Limited Adaptive Histogram Equalization normalizes local contrast grids to prevent noise amplification. 
+            This resolves variations in scanner magnetic strengths, ensuring standard illumination ranges before segmentation.
+          </p>
+          <div class="details-spec-badge" id="stageSpec">cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── FOOTER ─────────────────────────────────────────────────── -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <span class="footer-item"><strong>Frameworks:</strong> PyTorch 2.0 &middot; Flask &middot; OpenCV 4.x</span>
+        <span class="footer-divider">|</span>
+        <span class="footer-item"><strong>Training Core:</strong> Cosine Annealing LR &middot; AdamW Optimizer</span>
+      </div>
+      <div class="footer-right">
+        <span>Dataset: Brain Tumor MRI (7,200 Scans)</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- App Interactive Logic Script -->
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
