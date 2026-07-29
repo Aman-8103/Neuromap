@@ -1,6 +1,5 @@
-# Large data & model files
+# Large training data (not needed for deployment)
 Datasets/
-checkpoints/
 data_liver/
 
 # Python
