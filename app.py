@@ -13,6 +13,8 @@ API endpoints:
 import os
 import io
 import base64
+import urllib.request
+import traceback
 import numpy as np
 import cv2
 import torch
@@ -360,18 +362,41 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
 CHECKPOINT_PATH    = os.environ.get('MODEL_PATH', './checkpoints/neuromap_best.pth')
+MODEL_URL          = 'https://github.com/Kushalgupta02/Brain-tumour/raw/main/checkpoints/neuromap_best.pth'
 DEVICE             = 'cuda' if torch.cuda.is_available() else 'cpu'
 model              = None
+
+
+def download_model_if_needed(path, url):
+    """Download model from GitHub if missing or is a tiny LFS pointer file."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    need_download = False
+    if not os.path.exists(path):
+        print(f"⬇ Model not found at {path}. Downloading...")
+        need_download = True
+    elif os.path.getsize(path) < 1_000_000:  # <1MB means it's an LFS pointer
+        print(f"⬇ Model at {path} is only {os.path.getsize(path)} bytes (LFS pointer). Downloading real file...")
+        need_download = True
+    if need_download:
+        try:
+            print(f"⬇ Downloading model from {url} ...")
+            urllib.request.urlretrieve(url, path)
+            print(f"✅ Model downloaded: {os.path.getsize(path) / 1e6:.1f} MB")
+        except Exception as e:
+            print(f"❌ Failed to download model: {e}")
+            return False
+    return True
 
 
 def get_model():
     global model
     if model is None:
-        if os.path.exists(CHECKPOINT_PATH):
+        download_model_if_needed(CHECKPOINT_PATH, MODEL_URL)
+        if os.path.exists(CHECKPOINT_PATH) and os.path.getsize(CHECKPOINT_PATH) > 1_000_000:
             model = load_model(CHECKPOINT_PATH, device=DEVICE)
             print(f"Device: {DEVICE}")
         else:
-            print(f"⚠ No checkpoint at {CHECKPOINT_PATH}. Train first.")
+            print(f"⚠ No valid checkpoint at {CHECKPOINT_PATH}.")
     return model
 
 
@@ -396,7 +421,11 @@ def predict():
     m = get_model()
     if m is None:
         return jsonify({'error': 'Model not loaded. Run training first.'}), 503
-    return jsonify(run_inference(m, f.read(), device=DEVICE))
+    try:
+        return jsonify(run_inference(m, f.read(), device=DEVICE))
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': f'Inference failed: {str(e)}'}), 500
 
 
 @app.route('/health')

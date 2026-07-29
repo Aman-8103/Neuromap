@@ -2,16 +2,13 @@ services:
   - type: web
     name: neuromap-brain-tumor
     runtime: python
-    buildCommand: |
-      curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
-      apt-get install -y git-lfs
-      git lfs install
-      git lfs pull
-      pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12
       - key: MODEL_PATH
         value: ./checkpoints/neuromap_best.pth
+      - key: GIT_LFS_ENABLED
+        value: true
     plan: free
