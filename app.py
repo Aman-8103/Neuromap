@@ -244,14 +244,19 @@ class NeuroMapModel(nn.Module):
 
         self.backbone.zero_grad()
         one_hot = torch.zeros_like(logits)
-        one_hot[0][target] = 1
-        logits.backward(gradient=one_hot, retain_graph=True)
+        logits.backward(gradient=one_hot, retain_graph=False)
 
         weights = self.gradients.mean(dim=(2, 3), keepdim=True)
         cam     = (weights * self.activations).sum(dim=1).squeeze().cpu().numpy()
         cam     = np.maximum(cam, 0)
         cam     = cv2.resize(cam, (224, 224))
         cam     = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
+
+        # Clear references to free memory
+        self.gradients = None
+        self.activations = None
+        self.backbone.zero_grad()
+
         return cam, pred, probs.squeeze().detach().cpu().numpy()
 
 
@@ -442,13 +447,16 @@ def predict():
         return jsonify({'error': f'Inference failed: {str(e)}'}), 500
 
 
-@app.route('/health')
-def health():
-    m = get_model()
-    return jsonify({'status': 'ok', 'model_loaded': m is not None, 'device': DEVICE})
+# Pre-load model on module import so Gunicorn downloads/loads it at startup
+# (prevents HTTP request timeouts during first inference call)
+try:
+    print("🚀 Initializing model on application startup...")
+    get_model()
+except Exception as e:
+    print(f"⚠ Model initialization warning: {e}")
 
 
 if __name__ == '__main__':
-    get_model()
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
+

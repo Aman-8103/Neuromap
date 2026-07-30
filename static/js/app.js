@@ -486,11 +486,24 @@ async function runAnalysis() {
     });
     
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || `Server returned error status ${response.status}`);
+      let errorMsg = `Server returned status ${response.status}`;
+      try {
+        const err = await response.json();
+        errorMsg = err.error || errorMsg;
+      } catch (_) {
+        if (response.status === 502 || response.status === 504) {
+          errorMsg = 'Server is spinning up or timed out. Please wait 10 seconds and try again.';
+        }
+      }
+      throw new Error(errorMsg);
     }
-    
-    const data = await response.json();
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (_) {
+      throw new Error('Server returned invalid data format. Please try again.');
+    }
     
     setTimeout(() => {
       renderResults(data);
