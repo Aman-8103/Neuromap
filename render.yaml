@@ -3,12 +3,12 @@ services:
     name: neuromap-brain-tumor
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12
-      - key: MODEL_PATH
-        value: ./checkpoints/neuromap_best.pth
-      - key: GIT_LFS_ENABLED
-        value: true
+      - key: HF_REPO_ID
+        value: Kushal2114/neuromap-model
+      - key: HF_FILENAME
+        value: neuromap_best.pth
     plan: free

@@ -4,6 +4,9 @@ NeuroMap v2 — Flask Backend
 Incorporates NeuroSeg: a custom hybrid brain segmentation algorithm
 applied during both training (via notebooks) and inference (here).
 
+Model is downloaded from Hugging Face Hub on first startup,
+enabling deployment on Render free tier without Git LFS.
+
 API endpoints:
   GET  /          → serves the main UI
   POST /predict   → upload MRI, returns prediction + Grad-CAM + segmentation mask
@@ -13,7 +16,6 @@ API endpoints:
 import os
 import io
 import base64
-import urllib.request
 import traceback
 import numpy as np
 import cv2
@@ -23,6 +25,7 @@ import torch.nn.functional as F
 from torchvision import models, transforms
 from PIL import Image
 from flask import Flask, request, jsonify, render_template
+from huggingface_hub import hf_hub_download
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -254,7 +257,7 @@ class NeuroMapModel(nn.Module):
 
 def load_model(checkpoint_path, device='cpu'):
     m = NeuroMapModel().to(device)
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     m.load_state_dict(ckpt['model_state_dict'])
     m.eval()
     print(f"✅ Model loaded from {checkpoint_path}")
@@ -361,42 +364,53 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
-CHECKPOINT_PATH    = os.environ.get('MODEL_PATH', './checkpoints/neuromap_best.pth')
-MODEL_URL          = 'https://github.com/Kushalgupta02/Brain-tumour/raw/main/checkpoints/neuromap_best.pth'
-DEVICE             = 'cuda' if torch.cuda.is_available() else 'cpu'
-model              = None
+
+# Hugging Face Model repo for downloading the checkpoint
+HF_REPO_ID  = os.environ.get('HF_REPO_ID', 'Kushal2114/neuromap-model')
+HF_FILENAME = os.environ.get('HF_FILENAME', 'neuromap_best.pth')
+
+# Local cache path for the downloaded model
+CHECKPOINT_DIR  = os.environ.get('MODEL_DIR', './checkpoints')
+CHECKPOINT_PATH = os.path.join(CHECKPOINT_DIR, HF_FILENAME)
+
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+model  = None
 
 
-def download_model_if_needed(path, url):
-    """Download model from GitHub if missing or is a tiny LFS pointer file."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    need_download = False
-    if not os.path.exists(path):
-        print(f"⬇ Model not found at {path}. Downloading...")
-        need_download = True
-    elif os.path.getsize(path) < 1_000_000:  # <1MB means it's an LFS pointer
-        print(f"⬇ Model at {path} is only {os.path.getsize(path)} bytes (LFS pointer). Downloading real file...")
-        need_download = True
-    if need_download:
-        try:
-            print(f"⬇ Downloading model from {url} ...")
-            urllib.request.urlretrieve(url, path)
-            print(f"✅ Model downloaded: {os.path.getsize(path) / 1e6:.1f} MB")
-        except Exception as e:
-            print(f"❌ Failed to download model: {e}")
-            return False
-    return True
+def download_model_from_hf():
+    """Download model from Hugging Face Hub if not already cached locally."""
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+
+    # Check if we already have a valid local copy
+    if os.path.exists(CHECKPOINT_PATH) and os.path.getsize(CHECKPOINT_PATH) > 1_000_000:
+        print(f"✅ Model already cached at {CHECKPOINT_PATH} "
+              f"({os.path.getsize(CHECKPOINT_PATH) / 1e6:.1f} MB)")
+        return CHECKPOINT_PATH
+
+    print(f"⬇ Downloading model from HF Hub: {HF_REPO_ID}/{HF_FILENAME} ...")
+    try:
+        downloaded_path = hf_hub_download(
+            repo_id=HF_REPO_ID,
+            filename=HF_FILENAME,
+            local_dir=CHECKPOINT_DIR,
+            local_dir_use_symlinks=False,
+        )
+        print(f"✅ Model downloaded: {os.path.getsize(downloaded_path) / 1e6:.1f} MB")
+        return downloaded_path
+    except Exception as e:
+        print(f"❌ Failed to download model from HF Hub: {e}")
+        return None
 
 
 def get_model():
     global model
     if model is None:
-        download_model_if_needed(CHECKPOINT_PATH, MODEL_URL)
-        if os.path.exists(CHECKPOINT_PATH) and os.path.getsize(CHECKPOINT_PATH) > 1_000_000:
-            model = load_model(CHECKPOINT_PATH, device=DEVICE)
+        path = download_model_from_hf()
+        if path and os.path.exists(path) and os.path.getsize(path) > 1_000_000:
+            model = load_model(path, device=DEVICE)
             print(f"Device: {DEVICE}")
         else:
-            print(f"⚠ No valid checkpoint at {CHECKPOINT_PATH}.")
+            print(f"⚠ No valid checkpoint available.")
     return model
 
 

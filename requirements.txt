@@ -1,7 +1,9 @@
-flask
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
 torchvision
+flask
 opencv-python-headless
 numpy
 pillow
 gunicorn
+huggingface_hub

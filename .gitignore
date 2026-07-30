@@ -2,6 +2,9 @@
 Datasets/
 data_liver/
 
+# Model checkpoint (downloaded from HF Hub at runtime)
+checkpoints/*.pth
+
 # Python
 __pycache__/
 *.pyc
@@ -11,3 +14,6 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+# HF Space files (not needed in main repo)
+huggingface/
