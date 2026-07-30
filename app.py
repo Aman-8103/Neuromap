@@ -1,11 +1,10 @@
 """
-NeuroMap v2 — Flask Backend
-============================
-Incorporates NeuroSeg: a custom hybrid brain segmentation algorithm
-applied during both training (via notebooks) and inference (here).
+NeuroMap v2 — Flask Backend (ONNX Runtime Engine)
+=================================================
+Ultra-lightweight high-performance brain tumor classification API.
+Uses ONNX Runtime instead of PyTorch to stay well under Render Free Tier limits (<100MB RAM vs 512MB limit).
 
-Model is downloaded from Hugging Face Hub on first startup,
-enabling deployment on Render free tier without Git LFS.
+Downloads model weights from Hugging Face Hub (Kushal2114/neuromap-model).
 
 API endpoints:
   GET  /          → serves the main UI
@@ -19,30 +18,19 @@ import base64
 import traceback
 import numpy as np
 import cv2
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import models, transforms
+import onnxruntime as ort
 from PIL import Image
 from flask import Flask, request, jsonify, render_template
 from huggingface_hub import hf_hub_download
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# NEUROSEG — Proposed Hybrid Brain Segmentation Algorithm
+# NEUROSEG — Hybrid Brain Segmentation Algorithm
 # ══════════════════════════════════════════════════════════════════════════════
-# 5-stage pipeline. No pretrained weights, no external models.
-# Stage 1 — CLAHE              : adaptive contrast normalization
-# Stage 2 — Dual Threshold     : Otsu ∩ Adaptive Gaussian (handles uneven illumination)
-# Stage 3 — Morphological Ops  : open → close → dilate (noise removal + hole filling)
-# Stage 4 — Watershed          : precise boundary delineation via distance transform
-# Stage 5 — Convex Hull        : smooth anatomically consistent final mask
 
 class NeuroSeg:
     """
     Custom hybrid brain segmentation algorithm for MRI preprocessing.
-    Runs identically during training (notebooks) and inference (here),
-    ensuring the model's training and test distributions match perfectly.
     """
 
     def __init__(self, clahe_clip=3.0, clahe_grid=(8, 8),
@@ -53,52 +41,28 @@ class NeuroSeg:
         self.target_size     = target_size
 
     def _stage1_clahe(self, gray):
-        """CLAHE: normalize contrast region-by-region to handle scanner variation."""
-        clahe = cv2.createCLAHE(clipLimit=self.clahe_clip,
-                                 tileGridSize=self.clahe_grid)
+        clahe = cv2.createCLAHE(clipLimit=self.clahe_clip, tileGridSize=self.clahe_grid)
         return clahe.apply(gray)
 
     def _stage2_dual_threshold(self, enhanced):
-        """
-        Fuse Otsu (global) and Adaptive Gaussian (local) thresholds with bitwise AND.
-        Keeps only pixels BOTH methods agree are foreground → fewer false positives.
-        """
         blurred  = cv2.GaussianBlur(enhanced, (5, 5), 0)
-        _, otsu  = cv2.threshold(blurred, 0, 255,
-                                  cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        adaptive = cv2.adaptiveThreshold(blurred, 255,
-                       cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                       cv2.THRESH_BINARY, blockSize=35, C=2)
+        _, otsu  = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        adaptive = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                         cv2.THRESH_BINARY, blockSize=35, C=2)
         return cv2.bitwise_and(otsu, adaptive)
 
     def _stage3_morphological(self, binary_mask):
-        """
-        Open → Close → Dilate with elliptical kernel.
-        Open removes small noise blobs; Close fills internal holes;
-        Dilate recovers boundary pixels eroded by opening.
-        """
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE,
-            (self.morph_kernel_sz, self.morph_kernel_sz)
-        )
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.morph_kernel_sz, self.morph_kernel_sz))
         opened  = cv2.morphologyEx(binary_mask, cv2.MORPH_OPEN,  kernel)
         closed  = cv2.morphologyEx(opened,      cv2.MORPH_CLOSE, kernel)
         dilated = cv2.dilate(closed, kernel, iterations=1)
         return dilated
 
     def _stage4_watershed(self, enhanced, morphed):
-        """
-        Watershed with distance-transform seed selection.
-        Sure-foreground seeds = pixels >50% of peak distance from edge.
-        Fills the unknown boundary zone by growing from seeds,
-        stopping at intensity ridges (skull-brain interface).
-        """
         dist    = cv2.distanceTransform(morphed, cv2.DIST_L2, 5)
         _, sfg  = cv2.threshold(dist, 0.5 * dist.max(), 255, 0)
         sfg     = sfg.astype(np.uint8)
-        sbg     = cv2.dilate(morphed,
-                              cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21)),
-                              iterations=3)
+        sbg     = cv2.dilate(morphed, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21)), iterations=3)
         unknown = cv2.subtract(sbg, sfg)
 
         _, markers = cv2.connectedComponents(sfg)
@@ -113,18 +77,13 @@ class NeuroSeg:
         return refined
 
     def _stage5_convex_hull(self, refined):
-        """
-        Keep largest connected component (the brain), wrap in convex hull.
-        Convex hull fills concavities and produces smooth, anatomically valid mask.
-        """
         n, labels, stats, _ = cv2.connectedComponentsWithStats(refined)
         final = np.zeros_like(refined)
         if n > 1:
             lg  = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
             tmp = np.zeros_like(refined)
             tmp[labels == lg] = 255
-            cnts, _ = cv2.findContours(tmp, cv2.RETR_EXTERNAL,
-                                        cv2.CHAIN_APPROX_SIMPLE)
+            cnts, _ = cv2.findContours(tmp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if cnts:
                 hull = cv2.convexHull(max(cnts, key=cv2.contourArea))
                 cv2.fillConvexPoly(final, hull, 255)
@@ -133,20 +92,8 @@ class NeuroSeg:
         return final
 
     def segment(self, img_pil):
-        """
-        Run the full 5-stage NeuroSeg pipeline.
-
-        Args:
-            img_pil : PIL Image (RGB, any size)
-
-        Returns:
-            segmented_pil : PIL Image — brain-only crop at target_size × target_size
-            final_mask    : (H, W) uint8 binary numpy mask
-            bbox          : (x, y, w, h) bounding box of brain region
-        """
         img_np = np.array(img_pil.convert('RGB'))
 
-        # Handle side-by-side composite scans (e.g. Google image with two brains)
         h, w = img_np.shape[:2]
         if w > h * 1.5:
             img_np = img_np[:, :w // 2]
@@ -158,7 +105,6 @@ class NeuroSeg:
         refined  = self._stage4_watershed(enhanced, morphed)
         final    = self._stage5_convex_hull(refined)
 
-        # Apply mask and crop to bounding box with 5% padding
         masked = cv2.bitwise_and(img_np, img_np, mask=final)
         coords = cv2.findNonZero(final)
         if coords is not None:
@@ -173,13 +119,12 @@ class NeuroSeg:
         else:
             bbox = (0, 0, img_np.shape[1], img_np.shape[0])
 
-        resized = cv2.resize(masked, (self.target_size, self.target_size),
-                              interpolation=cv2.INTER_LINEAR)
+        resized = cv2.resize(masked, (self.target_size, self.target_size), interpolation=cv2.INTER_LINEAR)
         return Image.fromarray(resized), final, bbox
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# MODEL — EfficientNet-B3 with Grad-CAM
+# MODEL & INFERENCE — ONNX RUNTIME ENGINE
 # ══════════════════════════════════════════════════════════════════════════════
 
 CLASS_NAMES = ['glioma', 'meningioma', 'notumor', 'pituitary']
@@ -191,99 +136,91 @@ CLASS_INFO = {
     'notumor':    {'full_name': 'No Tumor Detected', 'description': 'No signs of tumor detected in the MRI scan.',              'severity': 'none',     'color': '#639922'},
 }
 
-TRANSFORM = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
-])
-
-
-class NeuroMapModel(nn.Module):
-    """EfficientNet-B3 fine-tuned for 4-class brain tumor classification."""
-
-    def __init__(self, num_classes=4, dropout_rate=0.4):
-        super().__init__()
-        self.backbone = models.efficientnet_b3(
-            weights=models.EfficientNet_B3_Weights.IMAGENET1K_V1
-        )
-        total_layers = len(list(self.backbone.features.children()))
-        for i, layer in enumerate(self.backbone.features.children()):
-            if i < int(total_layers * 0.8):
-                for param in layer.parameters():
-                    param.requires_grad = False
-
-        in_features = self.backbone.classifier[1].in_features
-        self.backbone.classifier = nn.Sequential(
-            nn.Dropout(p=dropout_rate, inplace=True),
-            nn.Linear(in_features, 512),
-            nn.ReLU(),
-            nn.Dropout(p=dropout_rate / 2),
-            nn.Linear(512, num_classes)
-        )
-        self.gradients  = None
-        self.activations = None
-        self._register_hooks()
-
-    def _register_hooks(self):
-        def fwd(m, i, o): self.activations = o.detach()
-        def bwd(m, gi, go): self.gradients = go[0].detach()
-        self.backbone.features[-1].register_forward_hook(fwd)
-        self.backbone.features[-1].register_full_backward_hook(bwd)
-
-    def forward(self, x):
-        return self.backbone(x)
-
-    def get_gradcam(self, x, class_idx=None):
-        self.eval()
-        x      = x.clone().requires_grad_(True)
-        logits = self.forward(x)
-        probs  = F.softmax(logits, dim=1)
-        pred   = logits.argmax(dim=1).item()
-        target = class_idx if class_idx is not None else pred
-
-        self.backbone.zero_grad()
-        one_hot = torch.zeros_like(logits)
-        logits.backward(gradient=one_hot, retain_graph=False)
-
-        weights = self.gradients.mean(dim=(2, 3), keepdim=True)
-        cam     = (weights * self.activations).sum(dim=1).squeeze().cpu().numpy()
-        cam     = np.maximum(cam, 0)
-        cam     = cv2.resize(cam, (224, 224))
-        cam     = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
-
-        # Clear references to free memory
-        self.gradients = None
-        self.activations = None
-        self.backbone.zero_grad()
-
-        return cam, pred, probs.squeeze().detach().cpu().numpy()
-
-
-def load_model(checkpoint_path, device='cpu'):
-    m = NeuroMapModel().to(device)
-    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    m.load_state_dict(ckpt['model_state_dict'])
-    m.eval()
-    print(f"✅ Model loaded from {checkpoint_path}")
-    return m
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# INFERENCE PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
+# Preprocessing transforms (ImageNet normalization)
+MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 _segmenter = NeuroSeg(target_size=224)
 
+# Global ONNX session and classifier weights
+_onnx_session = None
+_classifier_weights = None
 
-def run_inference(model, image_bytes, device='cpu'):
+HF_REPO_ID = os.environ.get('HF_REPO_ID', 'Kushal2114/neuromap-model')
+CHECKPOINT_DIR = os.environ.get('MODEL_DIR', './checkpoints')
+
+
+def load_onnx_engine():
+    """Loads ONNX model and classifier weights from local cache or HF Hub."""
+    global _onnx_session, _classifier_weights
+    if _onnx_session is not None and _classifier_weights is not None:
+        return _onnx_session, _classifier_weights
+
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    onnx_path = os.path.join(CHECKPOINT_DIR, 'neuromap_best.onnx')
+    weights_path = os.path.join(CHECKPOINT_DIR, 'classifier_weights.npz')
+
+    # Download ONNX model if needed
+    if not (os.path.exists(onnx_path) and os.path.getsize(onnx_path) > 1_000_000):
+        print(f"⬇ Downloading ONNX model from HF Hub ({HF_REPO_ID})...")
+        onnx_path = hf_hub_download(repo_id=HF_REPO_ID, filename='neuromap_best.onnx', local_dir=CHECKPOINT_DIR, local_dir_use_symlinks=False)
+
+    # Download classifier weights if needed
+    if not (os.path.exists(weights_path) and os.path.getsize(weights_path) > 10_000):
+        print(f"⬇ Downloading classifier weights from HF Hub ({HF_REPO_ID})...")
+        weights_path = hf_hub_download(repo_id=HF_REPO_ID, filename='classifier_weights.npz', local_dir=CHECKPOINT_DIR, local_dir_use_symlinks=False)
+
+    print("⚡ Initializing ONNX Runtime Inference Session...")
+    opts = ort.SessionOptions()
+    opts.intra_op_num_threads = 2
+    opts.inter_op_num_threads = 1
+    opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+    _onnx_session = ort.InferenceSession(onnx_path, sess_options=opts, providers=['CPUExecutionProvider'])
+    _classifier_weights = np.load(weights_path)
+    print("✅ ONNX Engine initialized successfully!")
+    return _onnx_session, _classifier_weights
+
+
+def preprocess_image(seg_pil):
+    """Normalize image to (1, 3, 224, 224) float32 numpy array."""
+    img_np = np.array(seg_pil.resize((224, 224))).astype(np.float32) / 255.0
+    img_norm = (img_np - MEAN) / STD
+    tensor = np.transpose(img_norm, (2, 0, 1))[np.newaxis, ...]
+    return tensor
+
+
+def generate_gradcam_onnx(logits, features, target_idx, weights_npz):
+    """
+    Computes class activation map (CAM) directly from ONNX feature maps
+    using exact classifier projection vectors.
+    """
+    fc1_w = weights_npz['fc1_w']
+    fc1_b = weights_npz['fc1_b']
+    fc2_w = weights_npz['fc2_w']
+
+    feat_map = features[0] # (1536, 7, 7)
+    pooled_feat = np.mean(feat_map, axis=(1, 2)) # (1536,)
+    h1 = np.maximum(0, fc1_w @ pooled_feat + fc1_b) # (512,)
+
+    # Effective channel weights for target class
+    w_channel = (fc2_w[target_idx] * (h1 > 0)) @ fc1_w # (1536,)
+    cam = np.sum(w_channel[:, None, None] * feat_map, axis=0)
+    cam = np.maximum(cam, 0)
+    cam = cv2.resize(cam, (224, 224))
+    cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
+    return cam
+
+
+def run_inference(image_bytes):
     """
     Full pipeline:
-      image_bytes → NeuroSeg → EfficientNet-B3 → Grad-CAM → overlay → JSON
+      image_bytes → NeuroSeg → ONNX Engine → CAM → overlay → JSON
     """
+    session, weights_npz = load_onnx_engine()
     img_pil = Image.open(io.BytesIO(image_bytes)).convert('RGB')
 
-    # ── NeuroSeg preprocessing ────────────────────────────────────────────────
     try:
         seg_pil, seg_mask, bbox = _segmenter.segment(img_pil)
     except Exception as e:
@@ -292,52 +229,53 @@ def run_inference(model, image_bytes, device='cpu'):
         seg_mask = np.ones((224, 224), dtype=np.uint8) * 255
         bbox     = (0, 0, 224, 224)
 
-    original_rgb = np.array(seg_pil)   # segmented image for display
-    tensor       = TRANSFORM(seg_pil).unsqueeze(0).to(device)
+    original_rgb = np.array(seg_pil)
+    tensor = preprocess_image(seg_pil)
 
-    # ── Prediction + Grad-CAM ────────────────────────────────────────────────
-    heatmap, pred_idx, probs = model.get_gradcam(tensor)
+    # ONNX Inference call
+    outputs = session.run(None, {'input': tensor})
+    logits, features = outputs[0], outputs[1]
+
+    # Softmax probabilities
+    exp_logits = np.exp(logits[0] - np.max(logits[0]))
+    probs = exp_logits / np.sum(exp_logits)
+    pred_idx = int(np.argmax(probs))
+
     pred_class = CLASS_NAMES[pred_idx]
     info       = CLASS_INFO[pred_class]
     confidence = float(probs[pred_idx])
 
-    # ── Encode segmentation mask for display ─────────────────────────────────
+    # Encode segmentation mask
     mask_colored = cv2.applyColorMap(seg_mask, cv2.COLORMAP_BONE)
     _, buf       = cv2.imencode('.png', mask_colored)
     mask_b64     = base64.b64encode(buf).decode('utf-8')
 
-    # ── Grad-CAM overlay (tumor classes only) ────────────────────────────────
+    # Grad-CAM overlay
     gradcam_b64 = None
     tumor_area_px = 0
     tumor_area_pct = 0.0
     tumor_area_mm2 = 0.0
     if pred_class != 'notumor':
+        heatmap = generate_gradcam_onnx(logits, features, pred_idx, weights_npz)
         hm_uint8   = (heatmap * 255).astype(np.uint8)
         hm_colored = cv2.applyColorMap(hm_uint8, cv2.COLORMAP_JET)
         hm_rgb     = cv2.cvtColor(hm_colored, cv2.COLOR_BGR2RGB)
-        overlay    = (original_rgb.astype(float) * 0.55 +
-                      hm_rgb.astype(float) * 0.45).astype(np.uint8)
+        overlay    = (original_rgb.astype(float) * 0.55 + hm_rgb.astype(float) * 0.45).astype(np.uint8)
 
         _, thresh   = cv2.threshold(hm_uint8, int(255 * 0.7), 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             largest_contour = max(contours, key=cv2.contourArea)
             cv2.drawContours(overlay, [largest_contour], -1, (255, 255, 255), 2)
-
-            # ── Compute tumor area ──────────────────────────────────────────
             tumor_area_px = int(cv2.contourArea(largest_contour))
-            total_brain_px = int(cv2.countNonZero(
-                cv2.cvtColor(original_rgb, cv2.COLOR_RGB2GRAY)
-            ))
+            total_brain_px = int(cv2.countNonZero(cv2.cvtColor(original_rgb, cv2.COLOR_RGB2GRAY)))
             if total_brain_px > 0:
                 tumor_area_pct = round((tumor_area_px / total_brain_px) * 100, 2)
-            # Approximate mm² assuming ~1 mm/px at 224×224 on a typical MRI FOV
             tumor_area_mm2 = round(tumor_area_px * 1.0, 1)
 
         _, buf      = cv2.imencode('.png', cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
         gradcam_b64 = base64.b64encode(buf).decode('utf-8')
 
-    # ── Encode segmented original for display ─────────────────────────────────
     _, buf   = cv2.imencode('.png', cv2.cvtColor(original_rgb, cv2.COLOR_RGB2BGR))
     orig_b64 = base64.b64encode(buf).decode('utf-8')
 
@@ -367,56 +305,7 @@ def run_inference(model, image_bytes, device='cpu'):
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
-
-# Hugging Face Model repo for downloading the checkpoint
-HF_REPO_ID  = os.environ.get('HF_REPO_ID', 'Kushal2114/neuromap-model')
-HF_FILENAME = os.environ.get('HF_FILENAME', 'neuromap_best.pth')
-
-# Local cache path for the downloaded model
-CHECKPOINT_DIR  = os.environ.get('MODEL_DIR', './checkpoints')
-CHECKPOINT_PATH = os.path.join(CHECKPOINT_DIR, HF_FILENAME)
-
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-model  = None
-
-
-def download_model_from_hf():
-    """Download model from Hugging Face Hub if not already cached locally."""
-    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
-
-    # Check if we already have a valid local copy
-    if os.path.exists(CHECKPOINT_PATH) and os.path.getsize(CHECKPOINT_PATH) > 1_000_000:
-        print(f"✅ Model already cached at {CHECKPOINT_PATH} "
-              f"({os.path.getsize(CHECKPOINT_PATH) / 1e6:.1f} MB)")
-        return CHECKPOINT_PATH
-
-    print(f"⬇ Downloading model from HF Hub: {HF_REPO_ID}/{HF_FILENAME} ...")
-    try:
-        downloaded_path = hf_hub_download(
-            repo_id=HF_REPO_ID,
-            filename=HF_FILENAME,
-            local_dir=CHECKPOINT_DIR,
-            local_dir_use_symlinks=False,
-        )
-        print(f"✅ Model downloaded: {os.path.getsize(downloaded_path) / 1e6:.1f} MB")
-        return downloaded_path
-    except Exception as e:
-        print(f"❌ Failed to download model from HF Hub: {e}")
-        return None
-
-
-def get_model():
-    global model
-    if model is None:
-        path = download_model_from_hf()
-        if path and os.path.exists(path) and os.path.getsize(path) > 1_000_000:
-            model = load_model(path, device=DEVICE)
-            print(f"Device: {DEVICE}")
-        else:
-            print(f"⚠ No valid checkpoint available.")
-    return model
 
 
 def allowed_file(fname):
@@ -437,26 +326,31 @@ def predict():
         return jsonify({'error': 'No file selected'}), 400
     if not allowed_file(f.filename):
         return jsonify({'error': f'Unsupported type. Use: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
-    m = get_model()
-    if m is None:
-        return jsonify({'error': 'Model not loaded. Run training first.'}), 503
+
     try:
-        return jsonify(run_inference(m, f.read(), device=DEVICE))
+        return jsonify(run_inference(f.read()))
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': f'Inference failed: {str(e)}'}), 500
 
 
-# Pre-load model on module import so Gunicorn downloads/loads it at startup
-# (prevents HTTP request timeouts during first inference call)
+@app.route('/health')
+def health():
+    try:
+        session, _ = load_onnx_engine()
+        loaded = session is not None
+    except Exception:
+        loaded = False
+    return jsonify({'status': 'ok', 'engine': 'onnxruntime', 'model_loaded': loaded})
+
+
+# Pre-initialize ONNX engine when Gunicorn imports app.py
 try:
-    print("🚀 Initializing model on application startup...")
-    get_model()
+    load_onnx_engine()
 except Exception as e:
-    print(f"⚠ Model initialization warning: {e}")
+    print(f"⚠ Engine initialization warning: {e}")
 
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
-
