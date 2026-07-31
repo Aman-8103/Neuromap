@@ -9,7 +9,7 @@
 
 **NeuroMap** is a web-based clinical diagnostic support system designed to detect and classify brain tumors (*Glioma, Meningioma, Pituitary Tumor, and No Tumor*) from MRI scans using a custom 5-stage hybrid segmentation algorithm (**NeuroSeg**) combined with an **EfficientNet-B3** deep learning classifier.
 
-To achieve **100% free, production-grade cloud deployment** without hardware costs or cloud server fees, we engineered a decoupled architecture using **Render** (for web application hosting) and **Hugging Face Model Hub** (for machine learning model weight distribution).
+To achieve **100% free, production-grade cloud deployment** without hardware costs, we engineered a decoupled multi-cloud microservices architecture using **Vercel** (for high-speed Global Edge CDN frontend hosting), **Render** (for Python/ONNX ML API processing), and **Hugging Face Model Hub** (for model weight distribution).
 
 ```
    ┌───────────────────────┐
@@ -19,7 +19,7 @@ To achieve **100% free, production-grade cloud deployment** without hardware cos
               │ (On Startup / Cached)
               ▼
    ┌───────────────────────┐          ┌───────────────────────┐
-   │    Render Web Server  │ ───────> │     User Web Browser  │
+   │    Render API Server  │ ───────> │  Vercel Edge Frontend │
    │  (Flask + ONNX Engine)│ <─────── │ (Cyber-Medical UI)   │
    └───────────────────────┘          └───────────────────────┘
 ```

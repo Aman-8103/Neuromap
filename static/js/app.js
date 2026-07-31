@@ -1,7 +1,9 @@
-/**
- * NeuroMap v2.5 — Frontend Logic Engine
- * Cyber-medical dashboard client script.
- */
+// ── CONFIGURATION & API ENDPOINT ──────────────────────────────────────────────
+const API_BASE_URL = (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname.includes('onrender.com')
+) ? '' : 'https://brain-tumour-1-rdeq.onrender.com';
 
 // ── CONSTANTS & MEDICAL META ─────────────────────────────────────────────────
 const CLASS_COLORS = {
@@ -480,7 +482,7 @@ async function runAnalysis() {
   });
   
   try {
-    const response = await fetch('/predict', {
+    const response = await fetch(`${API_BASE_URL}/predict`, {
       method: 'POST',
       body: formData
     });

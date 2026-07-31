@@ -21,6 +21,7 @@ import cv2
 import onnxruntime as ort
 from PIL import Image
 from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 from huggingface_hub import hf_hub_download
 
 
@@ -304,6 +305,7 @@ def run_inference(image_bytes):
 # ══════════════════════════════════════════════════════════════════════════════
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
 
