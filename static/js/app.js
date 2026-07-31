@@ -1,9 +1,13 @@
-// ── CONFIGURATION & API ENDPOINT ──────────────────────────────────────────────
 const API_BASE_URL = (
   window.location.hostname === 'localhost' ||
   window.location.hostname === '127.0.0.1' ||
   window.location.hostname.includes('onrender.com')
 ) ? '' : 'https://brain-tumour-1-rdeq.onrender.com';
+
+// Auto-ping backend on page load (wakes up Render if sleeping)
+if (API_BASE_URL) {
+  fetch(`${API_BASE_URL}/health`).catch(() => {});
+}
 
 // ── CONSTANTS & MEDICAL META ─────────────────────────────────────────────────
 const CLASS_COLORS = {
