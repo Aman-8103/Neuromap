@@ -327,8 +327,15 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['POST', 'OPTIONS'])
 def predict():
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        return response, 200
+
     if 'mri_scan' not in request.files:
         return jsonify({'error': 'No file. Use field name: mri_scan'}), 400
     f = request.files['mri_scan']
@@ -344,8 +351,13 @@ def predict():
         return jsonify({'error': f'Inference failed: {str(e)}'}), 500
 
 
-@app.route('/health')
+@app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response, 200
+
     try:
         session, _ = load_onnx_engine()
         loaded = session is not None
