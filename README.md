@@ -236,7 +236,9 @@ The server will start at **http://localhost:5000**
 
 
 
-![Dashboard]("https://github.com/user-attachments/assets/d9c0cfe5-85e6-48d0-bf80-dcaf6690d1cc" )
+<img width="1102" height="537" alt="Screenshot 2026-08-07 at 10 08 18 AM" src="https://github.com/user-attachments/assets/c70bb061-66b4-4937-abc7-856dd36c121d" />
+
+<img width="1104" height="782" alt="Screenshot 2026-08-07 at 10 09 08 AM" src="https://github.com/user-attachments/assets/711169e6-4443-4130-9dbe-4b7a091b89b2" />
 
 
 
