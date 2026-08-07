@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/OpenCV-4.x-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white" />
 </p>
 
-# 🧠 NeuroMap v2.5 — Brain Tumor Detection & Classification
+# 🧠 NeuroMap — Brain Tumor Detection & Classification
 
 A deep learning-powered web application that detects and classifies brain tumors from MRI scans using **EfficientNet-B3** with a custom **5-stage hybrid segmentation algorithm (NeuroSeg)**, **Grad-CAM explainability**, **severity classification**, and **tumor area estimation**.
 
